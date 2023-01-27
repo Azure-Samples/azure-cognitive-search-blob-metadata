@@ -1,0 +1,10 @@
+{
+    "name": "__datasourceName__",
+    "type": "azureblob",
+    "credentials": {
+        "connectionString": "__connectionString__"
+    },
+    "container": {
+        "name": "__containerName__"
+    }
+}

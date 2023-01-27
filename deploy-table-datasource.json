@@ -1,0 +1,11 @@
+{
+    "name": "__datasourceName__",
+    "type": "azuretable",
+    "credentials": {
+        "connectionString": "__connectionString__"
+    },
+    "container": {
+        "name": "__tableName__",
+        "query": "PartitionKey eq '__partitionKey__'"
+    }
+}

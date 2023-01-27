@@ -1,0 +1,90 @@
+# Set the main variables for the sample (modify these for your environment).
+REGION=<your region, for example 'westeurope'>
+RESOURCEGROUPNAME=<your resource group name, max. 14 characters>
+
+# Derive other variables (these should not be updated).
+STORAGEACCOUNTNAME=$RESOURCEGROUPNAME"storage"
+STORAGEACCOUNTCONTAINERNAME=samplefiles
+STORAGEACCOUNTTABLENAME=$STORAGEACCOUNTCONTAINERNAME"metadata"
+COGNITIVESEARCHNAME=$RESOURCEGROUPNAME"cognitivesearch"
+INDEXNAME=$STORAGEACCOUNTCONTAINERNAME-index
+BLOBDATASOURCENAME=$STORAGEACCOUNTCONTAINERNAME-blob-datasource
+BLOBINDEXERNAME=$STORAGEACCOUNTCONTAINERNAME-blob-indexer
+TABLEDATASOURCENAME=$STORAGEACCOUNTCONTAINERNAME-table-datasource
+TABLEINDEXERNAME=$STORAGEACCOUNTCONTAINERNAME-table-indexer
+COGNITIVESEARCHAPIVERSION=2020-06-30
+
+# Log in to Azure using the CLI (you can skip this if you're already logged in).
+az login
+
+# Create the resource group and supporting storage services.
+az group create --location $REGION --name $RESOURCEGROUPNAME
+az storage account create --location $REGION --resource-group $RESOURCEGROUPNAME --name $STORAGEACCOUNTNAME --kind StorageV2 --sku Standard_LRS
+STORAGEACCOUNTCONNECTIONSTRING=$(az storage account show-connection-string --resource-group $RESOURCEGROUPNAME --name $STORAGEACCOUNTNAME --query connectionString --output tsv)
+az storage container create --connection-string $STORAGEACCOUNTCONNECTIONSTRING --name $STORAGEACCOUNTCONTAINERNAME --public-access off
+az storage table create --connection-string $STORAGEACCOUNTCONNECTIONSTRING --name $STORAGEACCOUNTTABLENAME
+
+# Upload sample data to the blob storage container.
+az storage blob upload-batch --connection-string $STORAGEACCOUNTCONNECTIONSTRING --destination $STORAGEACCOUNTCONTAINERNAME --source "./samplefiles"
+
+# Process each blob to set the right metadata for this sample.
+BLOBNAMES=$(az storage blob list --connection-string $STORAGEACCOUNTCONNECTIONSTRING --container-name $STORAGEACCOUNTCONTAINERNAME --query "[].name" --output tsv)
+AUTHORS=("John Doe" "Jane Roe")
+BUSINESSIMPACTS=("high" "medium" "low")
+IFS=$'\n' # Use a newline as the separator for the list of blob names returned from the previous command
+for BLOBNAME in $BLOBNAMES; do
+    # Fetch the full blob URL.
+    BLOBURL=$(az storage blob url --connection-string $STORAGEACCOUNTCONNECTIONSTRING --container-name $STORAGEACCOUNTCONTAINERNAME --name $BLOBNAME --output tsv)
+
+    # Set the custom "author" metadata value (generated at random) directly on the blob itself.
+    AUTHOR=${AUTHORS[$RANDOM % ${#AUTHORS[@]}]}
+    az storage blob metadata update --connection-string $STORAGEACCOUNTCONNECTIONSTRING --container-name $STORAGEACCOUNTCONTAINERNAME --name $BLOBNAME --metadata "author=$AUTHOR"
+
+    # Upload the "document_type" and "business_impact" metadata values to table storage, separate from the blob.
+    # The "metadata_storage_path" column in the table is used
+    # Any partition key can be used here, we use the storage account name for this sample.
+    PARTITIONKEY=$STORAGEACCOUNTCONTAINERNAME
+    # Any row key can be used here, as long as it is unique within the partition.
+    # For this sample, we base64 encode the blob URL so it can be used as a unique row key.
+    # See https://learn.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#characters-disallowed-in-key-fields.
+    ROWKEY=$(echo $BLOBURL | base64 --wrap=0)
+    # The "document_type" is set to the containing folder.
+    DOCUMENTTYPE=${BLOBNAME%/*} # Take the folder path of the blob name (i.e. everything before the last '/') as the document type
+    # The "business_impact" is generated at random.
+    BUSINESSIMPACT=${BUSINESSIMPACTS[$RANDOM % ${#BUSINESSIMPACTS[@]}]}
+    # Create a row in the table with the (unencoded) "metadata_storage_path" for the document key as well as all the metadata to be added to the search index.
+    az storage entity insert --connection-string $STORAGEACCOUNTCONNECTIONSTRING --table-name $STORAGEACCOUNTTABLENAME --entity PartitionKey=$PARTITIONKEY RowKey=$ROWKEY metadata_storage_path=$BLOBURL document_type=$DOCUMENTTYPE business_impact=$BUSINESSIMPACT
+done
+
+# Create the Azure Cognitive Search service.
+az search service create --location $REGION --resource-group $RESOURCEGROUPNAME --name $COGNITIVESEARCHNAME --sku Basic --partition-count 1 --replica-count 1
+COGNITIVESEARCHADMINKEY=$(az search admin-key show --resource-group $RESOURCEGROUPNAME --service-name $COGNITIVESEARCHNAME --query primaryKey --output tsv)
+
+# Create the index for the files and their metadata.
+cat "deploy-index.json" | \
+    awk '{sub(/__indexName__/,"'$INDEXNAME'")}1' | \
+    curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/indexes/$INDEXNAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
+
+# Create the data source for blob storage.
+cat "deploy-blob-datasource.json" | \
+    awk '{sub(/__datasourceName__/,"'$BLOBDATASOURCENAME'")}1' | awk '{sub(/__connectionString__/,"'$STORAGEACCOUNTCONNECTIONSTRING'")}1' | awk '{sub(/__containerName__/,"'$STORAGEACCOUNTCONTAINERNAME'")}1' | \
+    curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/datasources/$BLOBDATASOURCENAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
+
+# Create the indexer for blob storage.
+cat "deploy-blob-indexer.json" | \
+    awk '{sub(/__indexerName__/,"'$BLOBINDEXERNAME'")}1' | awk '{sub(/__datasourceName__/,"'$BLOBDATASOURCENAME'")}1' | awk '{sub(/__indexName__/,"'$INDEXNAME'")}1' | \
+    curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/indexers/$BLOBINDEXERNAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
+
+# Create the data source for table storage.
+cat "deploy-table-datasource.json" | \
+    awk '{sub(/__datasourceName__/,"'$TABLEDATASOURCENAME'")}1' | awk '{sub(/__connectionString__/,"'$STORAGEACCOUNTCONNECTIONSTRING'")}1' | awk '{sub(/__tableName__/,"'$STORAGEACCOUNTTABLENAME'")}1' | awk '{sub(/__partitionKey__/,"'$PARTITIONKEY'")}1' | \
+    curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/datasources/$TABLEDATASOURCENAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
+
+# Create the indexer for table storage.
+cat "deploy-table-indexer.json" | \
+    awk '{sub(/__indexerName__/,"'$TABLEINDEXERNAME'")}1' | awk '{sub(/__datasourceName__/,"'$TABLEDATASOURCENAME'")}1' | awk '{sub(/__indexName__/,"'$INDEXNAME'")}1' | \
+    curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/indexers/$TABLEINDEXERNAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
+
+# Perform a query which returns a single document with just its file name in blob storage and the metadata properties from table storage.
+# Note that it could take a few seconds until this starts returning results, as the indexers have to complete in the background first.
+curl "https://$COGNITIVESEARCHNAME.search.windows.net/indexes/$INDEXNAME/docs?api-version=$COGNITIVESEARCHAPIVERSION&\$top=1&\$select=metadata_storage_name,author,document_type,business_impact" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY"

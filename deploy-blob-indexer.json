@@ -1,0 +1,23 @@
+{
+    "name": "__indexerName__",
+    "dataSourceName": "__datasourceName__",
+    "targetIndexName": "__indexName__",
+    "parameters": {
+        "base64EncodeKeys": false,
+        "configuration": {
+            "dataToExtract": "contentAndMetadata",
+            "parsingMode": "default",
+            "firstLineContainsHeaders": false,
+            "delimitedTextDelimiter": ","
+        }
+    },
+    "fieldMappings": [
+        {
+            "sourceFieldName": "metadata_storage_path",
+            "targetFieldName": "metadata_storage_path",
+            "mappingFunction": {
+                "name": "base64Encode"
+            }
+        }
+    ]
+}
