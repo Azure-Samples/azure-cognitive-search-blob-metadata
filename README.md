@@ -20,7 +20,14 @@ By default, a few basic text files are uploaded to Blob storage from the `sample
 
 ### Quickstart
 
-In Bash, go through the commands in the [`deploy.azcli`](deploy.azcli) file to deploy and configure everything. You only have to change the first few lines to set the Azure region and resource group name.
+In your bash terminal, run the following commands to clone this repository:
+
+```bash
+git clone https://github.com/Azure-Samples/azure-cognitive-search-blob-metadata.git
+cd azure-cognitive-search-blob-metadata
+```
+
+Edit the first few lines in [`deploy.azcli`](deploy.azcli) to set the Azure region and resource group name. Using bash, run the lines from [`deploy.azcli`](deploy.azcli) in order. You can copy-paste groups of commands to your bash terminal, or if you are using [Visual Studio Code](https://code.visualstudio.com/) with the [Azure CLI Tools extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.azurecli) you can highlight each section and use the "Run Line in Terminal" function.
 
 In order to create the index, data sources and indexers in Azure Cognitive Search, this sample uses a few template files. The most relevant files for this sample are:
 
@@ -36,8 +43,12 @@ In order to create the index, data sources and indexers in Azure Cognitive Searc
 
 ## Demo
 
-The final line in the [`deploy.azcli`](deploy.azcli) file performs a search against the index. After a few seconds, this should start returning a JSON structure with the most interesting information for a single document: the search performs a `$top=1` to limit the results and `$select` to only return the file name and the relevant metadata values.
+The last `curl` command in the [`deploy.azcli`](deploy.azcli) file performs a search against the index. After a few seconds, this should start returning a JSON structure with the most interesting information for a single document: the search performs a `$top=1` to limit the results and `$select` to only return the file name and the relevant metadata values.
 
 The important outcome here is that a *single* document will contain both the `author` metadata (coming from Blob storage) as well as the `document_type` and `business_impact` values (coming from Table storage).
 
 You can also interactively search for documents in the Azure Portal by using the [Search explorer](https://learn.microsoft.com/azure/search/search-explorer#start-search-explorer).
+
+## Cleanup
+
+To clean up the resources created for this demo, run the last command in the [`deploy.azcli`](deploy.azcli) file or manually delete the resource group again which contains all your resources.

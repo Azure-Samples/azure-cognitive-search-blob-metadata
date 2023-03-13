@@ -85,6 +85,11 @@ cat "deploy-table-indexer.json" | \
     awk '{sub(/__indexerName__/,"'$TABLEINDEXERNAME'")}1' | awk '{sub(/__datasourceName__/,"'$TABLEDATASOURCENAME'")}1' | awk '{sub(/__indexName__/,"'$INDEXNAME'")}1' | \
     curl -X PUT "https://$COGNITIVESEARCHNAME.search.windows.net/indexers/$TABLEINDEXERNAME?api-version=$COGNITIVESEARCHAPIVERSION" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY" -d @-
 
+echo "Waiting 15 seconds for indexing to complete before continuing..."; sleep 15
+
 # Perform a query which returns a single document with just its file name in blob storage and the metadata properties from table storage.
 # Note that it could take a few seconds until this starts returning results, as the indexers have to complete in the background first.
 curl "https://$COGNITIVESEARCHNAME.search.windows.net/indexes/$INDEXNAME/docs?api-version=$COGNITIVESEARCHAPIVERSION&\$top=1&\$select=metadata_storage_name,author,document_type,business_impact" -H "Content-Type: application/json" -H "api-key: $COGNITIVESEARCHADMINKEY"
+
+# When you're done, clean up all resources.
+az group delete --name $RESOURCEGROUPNAME
