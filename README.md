@@ -1,6 +1,7 @@
 # Indexing file contents and metadata in Azure Cognitive Search
 
-This sample demonstrates how to use [multiple indexers](https://learn.microsoft.com/azure/search/search-indexer-overview#indexer-scenarios-and-use-cases) in [Azure Cognitive Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search) to create a single [search index](https://learn.microsoft.com/azure/search/search-what-is-an-index) from files in [Blob storage](https://learn.microsoft.com/azure/storage/blobs/storage-blobs-overview), with additional file metadata in [Table storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview).
+This sample demonstrates how to use [multiple indexers](https://learn.microsoft.com/azure/search/search-indexer-overview#indexer-scenarios-and-use-cases) in [Azure Cognitive Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search) to create a single [search index](https://learn.microsoft.com/azure/search/search-what-is-an-index) from files in [Blob storage](https://learn.microsoft.com/azure/storage/blobs/storage-blobs-overview), with additional file metadata in [Table storage](https://learn.microsoft.com/azure/storage/tables/table-storage-overview). The scenario is described in detail in the [Index file content and metadata by using Azure Cognitive Search
+](https://learn.microsoft.com/azure/architecture/example-scenario/data/search-blob-metadata) article in [Azure Architecture Center](https://learn.microsoft.com/azure/architecture/).
 
 ## Getting Started
 
